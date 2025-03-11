@@ -13,7 +13,10 @@ import {
   GitBranch,
   Edit,
   UserPlus,
+  Activity,
 } from "lucide-react";
+import ProjectHealthBadge from "@/components/project-health-badge";
+import { calculateHealthScore } from "@/utils/project-health";
 import Link from "next/link";
 import ProjectMembers from "@/components/project-members";
 import ProjectCommits from "@/components/project-commits";
@@ -93,6 +96,50 @@ export default async function ProjectDetailsPage({
     .eq("project_id", project.id)
     .order("created_at", { ascending: false });
 
+  // Calculate project health score
+  const oneWeekAgo = new Date();
+  oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
+
+  const recentCommits =
+    commits?.filter((commit) => new Date(commit.created_at) > oneWeekAgo) || [];
+
+  const completedCommits =
+    commits?.filter((commit) => commit.status === "completed") || [];
+
+  const activeMembers =
+    members?.filter(
+      (member) =>
+        // For demo purposes, consider all members active
+        true,
+    ) || [];
+
+  // Get join requests in the last month
+  const { data: joinRequests } = await supabase
+    .from("join_requests")
+    .select("*")
+    .eq("project_id", project.id)
+    .gte(
+      "created_at",
+      new Date(new Date().setMonth(new Date().getMonth() - 1)).toISOString(),
+    );
+
+  const healthScore = calculateHealthScore(
+    {
+      count: commits?.length || 0,
+      frequency: recentCommits.length,
+      completedCount: completedCommits.length,
+    },
+    {
+      total: 10, // Mock test data
+      passed: 8, // Mock test data
+    },
+    {
+      memberCount: members?.length || 0,
+      activeMembers: activeMembers.length,
+      joinRequests: joinRequests?.length || 0,
+    },
+  );
+
   return (
     <>
       <DashboardNavbar />
@@ -117,6 +164,9 @@ export default async function ProjectDetailsPage({
                     </>
                   )}
                 </Badge>
+                <div className="ml-2">
+                  <ProjectHealthBadge healthScore={healthScore} />
+                </div>
               </div>
               <div className="flex items-center text-sm text-muted-foreground">
                 <Calendar className="h-4 w-4 mr-1" />
@@ -180,13 +230,68 @@ export default async function ProjectDetailsPage({
 
           {isProjectMember ? (
             <Tabs defaultValue="overview" className="w-full">
-              <TabsList className="grid w-full grid-cols-3 mb-8">
+              <TabsList className="grid w-full grid-cols-4 mb-8">
                 <TabsTrigger value="overview">Overview</TabsTrigger>
                 <TabsTrigger value="commits">Commits</TabsTrigger>
                 <TabsTrigger value="team">Team</TabsTrigger>
+                <TabsTrigger value="workflow">Workflow</TabsTrigger>
               </TabsList>
 
               <TabsContent value="overview">
+                <div className="mb-6">
+                  <Card>
+                    <CardContent className="pt-6">
+                      <h3 className="text-lg font-semibold mb-4 flex items-center">
+                        <Activity className="h-5 w-5 mr-2 text-blue-500" />
+                        Project Health
+                      </h3>
+                      <div className="flex flex-col md:flex-row md:items-center gap-4">
+                        <div>
+                          <ProjectHealthBadge
+                            healthScore={healthScore}
+                            showDetails={true}
+                          />
+                        </div>
+                        <div className="md:ml-8 space-y-2">
+                          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                            <div className="bg-muted/50 p-3 rounded-md text-center">
+                              <div className="text-2xl font-bold">
+                                {commits?.length || 0}
+                              </div>
+                              <div className="text-sm text-muted-foreground">
+                                Total Commits
+                              </div>
+                            </div>
+                            <div className="bg-muted/50 p-3 rounded-md text-center">
+                              <div className="text-2xl font-bold">
+                                {completedCommits.length}
+                              </div>
+                              <div className="text-sm text-muted-foreground">
+                                Completed
+                              </div>
+                            </div>
+                            <div className="bg-muted/50 p-3 rounded-md text-center">
+                              <div className="text-2xl font-bold">
+                                {members?.length || 0}
+                              </div>
+                              <div className="text-sm text-muted-foreground">
+                                Team Members
+                              </div>
+                            </div>
+                            <div className="bg-muted/50 p-3 rounded-md text-center">
+                              <div className="text-2xl font-bold">
+                                {recentCommits.length}
+                              </div>
+                              <div className="text-sm text-muted-foreground">
+                                Recent Activity
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </div>
                 <div className="grid md:grid-cols-2 gap-6">
                   <Card>
                     <CardContent className="pt-6">
@@ -279,6 +384,24 @@ export default async function ProjectDetailsPage({
                   isProjectCreator={isProjectCreator}
                   projectId={project.id}
                 />
+              </TabsContent>
+
+              <TabsContent value="workflow">
+                <div className="text-center py-8">
+                  <h3 className="text-lg font-medium mb-4">
+                    Team Workflow Management
+                  </h3>
+                  <p className="text-muted-foreground mb-6">
+                    {isProjectCreator
+                      ? "Create and manage your team's workflow with a visual board. Drag and drop elements to build a custom workflow."
+                      : "View the project workflow in a structured table format. See how tasks, team members, and resources are connected."}
+                  </p>
+                  <Link href={`/dashboard/projects/${params.id}/workflow`}>
+                    <Button>
+                      {isProjectCreator ? "Manage Workflow" : "View Workflow"}
+                    </Button>
+                  </Link>
+                </div>
               </TabsContent>
             </Tabs>
           ) : (

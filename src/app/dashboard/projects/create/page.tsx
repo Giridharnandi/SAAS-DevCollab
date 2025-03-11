@@ -28,6 +28,28 @@ export default async function CreateProjectPage() {
     );
   }
 
+  // Get user's subscription to determine project limits
+  const { data: userProfile } = await supabase
+    .from("users")
+    .select("subscription, subscription_status, subscription_period_end")
+    .eq("id", user.id)
+    .single();
+
+  // Check if user has reached project limit (for free plan)
+  if (!userProfile?.subscription) {
+    const { data: projectCount } = await supabase
+      .from("projects")
+      .select("id", { count: true })
+      .eq("creator_id", user.id);
+
+    const count = projectCount?.length || 0;
+    if (count >= 5) {
+      return redirect(
+        "/dashboard/profile?error=You have reached the maximum number of projects for the free plan. Please upgrade to create more projects.",
+      );
+    }
+  }
+
   return (
     <>
       <DashboardNavbar />
@@ -47,7 +69,10 @@ export default async function CreateProjectPage() {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <ProjectForm user={user} />
+              <ProjectForm
+                user={user}
+                subscription={userProfile?.subscription}
+              />
             </CardContent>
           </Card>
         </div>

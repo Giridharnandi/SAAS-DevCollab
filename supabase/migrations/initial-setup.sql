@@ -1,165 +1,263 @@
--- Combined migration file that includes all necessary database setup
+-- Enable UUID extension
+CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
--- Users table
-CREATE TABLE IF NOT EXISTS public.users (
-    id uuid PRIMARY KEY NOT NULL,
-    avatar_url text,
-    user_id text UNIQUE,
-    token_identifier text NOT NULL,
-    subscription text,
-    credits text,
-    image text,
-    created_at timestamp with time zone NOT NULL DEFAULT timezone('utc'::text, now()),
-    updated_at timestamp with time zone,
-    email text,
-    name text,
-    full_name text
+-- Create users table that mirrors auth.users
+CREATE TABLE IF NOT EXISTS users (
+  id UUID PRIMARY KEY REFERENCES auth.users(id),
+  user_id UUID,
+  name TEXT,
+  email TEXT,
+  avatar_url TEXT,
+  image TEXT,
+  token_identifier TEXT NOT NULL,
+  username TEXT,
+  full_name TEXT,
+  description TEXT,
+  location TEXT,
+  mobile TEXT,
+  profile_picture TEXT,
+  theme TEXT,
+  user_role TEXT,
+  credits TEXT,
+  subscription TEXT,
+  subscription_id TEXT,
+  subscription_status TEXT,
+  subscription_period_end TIMESTAMP WITH TIME ZONE,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE
 );
 
--- Subscriptions table
-CREATE TABLE IF NOT EXISTS public.subscriptions (
-    id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
-    user_id text REFERENCES public.users(user_id),
-    stripe_id text UNIQUE,
-    price_id text,
-    stripe_price_id text,
-    currency text,
-    interval text,
-    status text,
-    current_period_start bigint,
-    current_period_end bigint,
-    cancel_at_period_end boolean,
-    amount bigint,
-    started_at bigint,
-    ends_at bigint,
-    ended_at bigint,
-    canceled_at bigint,
-    customer_cancellation_reason text,
-    customer_cancellation_comment text,
-    metadata jsonb,
-    custom_field_data jsonb,
-    customer_id text,
-    created_at timestamp with time zone DEFAULT timezone('utc'::text, now()) NOT NULL,
-    updated_at timestamp with time zone DEFAULT timezone('utc'::text, now()) NOT NULL
+-- Create projects table
+CREATE TABLE IF NOT EXISTS projects (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  title TEXT NOT NULL,
+  description TEXT,
+  creator_id UUID REFERENCES auth.users(id) NOT NULL,
+  visibility TEXT DEFAULT 'public',
+  team_size INTEGER DEFAULT 5,
+  repository_link TEXT,
+  cover_image TEXT,
+  workflow_data JSONB,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
-CREATE INDEX IF NOT EXISTS subscriptions_stripe_id_idx ON public.subscriptions(stripe_id);
-CREATE INDEX IF NOT EXISTS subscriptions_user_id_idx ON public.subscriptions(user_id);
+-- Create project_members table
+CREATE TABLE IF NOT EXISTS project_members (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  project_id UUID REFERENCES projects(id) NOT NULL,
+  user_id UUID REFERENCES auth.users(id) NOT NULL,
+  joined_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  UNIQUE(project_id, user_id)
+);
+
+-- Create join_requests table
+CREATE TABLE IF NOT EXISTS join_requests (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  project_id UUID REFERENCES projects(id) NOT NULL,
+  user_id UUID REFERENCES auth.users(id) NOT NULL,
+  message TEXT,
+  status TEXT DEFAULT 'pending',
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE,
+  UNIQUE(project_id, user_id)
+);
+
+-- Create commits table
+CREATE TABLE IF NOT EXISTS commits (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  project_id UUID REFERENCES projects(id) NOT NULL,
+  message TEXT NOT NULL,
+  assigned_to UUID REFERENCES auth.users(id),
+  status TEXT DEFAULT 'pending',
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  completed_at TIMESTAMP WITH TIME ZONE
+);
+
+-- Create subscriptions table
+CREATE TABLE IF NOT EXISTS subscriptions (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  user_id UUID REFERENCES users(user_id),
+  stripe_id TEXT,
+  stripe_price_id TEXT,
+  price_id TEXT,
+  status TEXT,
+  interval TEXT,
+  amount NUMERIC,
+  currency TEXT,
+  current_period_start TIMESTAMP WITH TIME ZONE,
+  current_period_end TIMESTAMP WITH TIME ZONE,
+  cancel_at_period_end BOOLEAN DEFAULT FALSE,
+  canceled_at NUMERIC,
+  customer_id TEXT,
+  started_at NUMERIC,
+  ended_at NUMERIC,
+  ends_at NUMERIC,
+  customer_cancellation_reason TEXT,
+  customer_cancellation_comment TEXT,
+  metadata JSONB,
+  custom_field_data JSONB,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
 
 -- Create webhook_events table
-CREATE TABLE IF NOT EXISTS public.webhook_events (
-    id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
-    event_type text NOT NULL,
-    type text NOT NULL,
-    stripe_event_id text,
-    data jsonb,
-    created_at timestamp with time zone DEFAULT timezone('utc'::text, now()) NOT NULL,
-    modified_at timestamp with time zone DEFAULT timezone('utc'::text, now()) NOT NULL
+CREATE TABLE IF NOT EXISTS webhook_events (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  type TEXT NOT NULL,
+  event_type TEXT NOT NULL,
+  stripe_event_id TEXT,
+  data JSONB,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  modified_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
-CREATE INDEX IF NOT EXISTS webhook_events_type_idx ON public.webhook_events(type);
-CREATE INDEX IF NOT EXISTS webhook_events_stripe_event_id_idx ON public.webhook_events(stripe_event_id);
-CREATE INDEX IF NOT EXISTS webhook_events_event_type_idx ON public.webhook_events(event_type);
+-- Set up RLS policies
+ALTER TABLE users ENABLE ROW LEVEL SECURITY;
+ALTER TABLE projects ENABLE ROW LEVEL SECURITY;
+ALTER TABLE project_members ENABLE ROW LEVEL SECURITY;
+ALTER TABLE join_requests ENABLE ROW LEVEL SECURITY;
+ALTER TABLE commits ENABLE ROW LEVEL SECURITY;
 
--- Add RLS (Row Level Security) policies
-ALTER TABLE public.users ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.subscriptions ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.webhook_events ENABLE ROW LEVEL SECURITY;
+-- Users policies
+CREATE POLICY "Users can view all users"
+ON users FOR SELECT
+TO authenticated
+USING (true);
 
--- Create policies if they don't exist
-DO $$
-BEGIN
-    -- Check if the policy for users exists
-    IF NOT EXISTS (
-        SELECT 1 FROM pg_policies 
-        WHERE schemaname = 'public' 
-        AND tablename = 'users' 
-        AND policyname = 'Users can view own data'
-    ) THEN
-        -- Create policy to allow users to see only their own data
-        EXECUTE 'CREATE POLICY "Users can view own data" ON public.users
-                FOR SELECT USING (auth.uid()::text = user_id)';
-    END IF;
+CREATE POLICY "Users can update their own data"
+ON users FOR UPDATE
+TO authenticated
+USING (auth.uid() = id);
 
-    -- Check if the policy for subscriptions exists
-    IF NOT EXISTS (
-        SELECT 1 FROM pg_policies 
-        WHERE schemaname = 'public' 
-        AND tablename = 'subscriptions' 
-        AND policyname = 'Users can view own subscriptions'
-    ) THEN
-        -- Create policy for subscriptions
-        EXECUTE 'CREATE POLICY "Users can view own subscriptions" ON public.subscriptions
-                FOR SELECT USING (auth.uid()::text = user_id)';
-    END IF;
-    
-    -- Check if the policy for webhook_events exists
-    IF NOT EXISTS (
-        SELECT 1 FROM pg_policies 
-        WHERE schemaname = 'public' 
-        AND tablename = 'webhook_events' 
-        AND policyname = 'Service role can manage webhook events'
-    ) THEN
-        -- Create policy for webhook_events to allow service role access
-        EXECUTE 'CREATE POLICY "Service role can manage webhook events" ON public.webhook_events
-                FOR ALL TO service_role USING (true)';
-    END IF;
-END
-$$;
+-- Projects policies
+CREATE POLICY "Public projects are viewable by everyone"
+ON projects FOR SELECT
+TO authenticated
+USING (visibility = 'public');
 
--- Create a function that will be triggered when a new user signs up
-CREATE OR REPLACE FUNCTION public.handle_new_user()
-RETURNS TRIGGER AS $$
-BEGIN
-  INSERT INTO public.users (
-    id,
-    user_id,
-    email,
-    name,
-    full_name,
-    avatar_url,
-    token_identifier,
-    created_at,
-    updated_at
-  ) VALUES (
-    NEW.id,
-    NEW.id::text,
-    NEW.email,
-    NEW.raw_user_meta_data->>'name',
-    NEW.raw_user_meta_data->>'full_name',
-    NEW.raw_user_meta_data->>'avatar_url',
-    NEW.email,
-    NEW.created_at,
-    NEW.updated_at
-  );
-  RETURN NEW;
-END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
+CREATE POLICY "Private projects are viewable by members"
+ON projects FOR SELECT
+TO authenticated
+USING (
+  visibility = 'private' AND
+  EXISTS (
+    SELECT 1 FROM project_members
+    WHERE project_members.project_id = id
+    AND project_members.user_id = auth.uid()
+  )
+);
 
--- Create a trigger to call the function when a new user is added to auth.users
-DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
-CREATE TRIGGER on_auth_user_created
-  AFTER INSERT ON auth.users
-  FOR EACH ROW EXECUTE FUNCTION public.handle_new_user();
+CREATE POLICY "Project creators can update their projects"
+ON projects FOR UPDATE
+TO authenticated
+USING (creator_id = auth.uid());
 
--- Update the function to handle user updates as well
-CREATE OR REPLACE FUNCTION public.handle_user_update()
-RETURNS TRIGGER AS $$
-BEGIN
-  UPDATE public.users
-  SET
-    email = NEW.email,
-    name = NEW.raw_user_meta_data->>'name',
-    full_name = NEW.raw_user_meta_data->>'full_name',
-    avatar_url = NEW.raw_user_meta_data->>'avatar_url',
-    updated_at = NEW.updated_at
-  WHERE user_id = NEW.id::text;
-  RETURN NEW;
-END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
+CREATE POLICY "Project creators can delete their projects"
+ON projects FOR DELETE
+TO authenticated
+USING (creator_id = auth.uid());
 
--- Create a trigger to call the function when a user is updated in auth.users
-DROP TRIGGER IF EXISTS on_auth_user_updated ON auth.users;
-CREATE TRIGGER on_auth_user_updated
-  AFTER UPDATE ON auth.users
-  FOR EACH ROW EXECUTE FUNCTION public.handle_user_update(); 
+CREATE POLICY "Authenticated users can create projects"
+ON projects FOR INSERT
+TO authenticated
+WITH CHECK (creator_id = auth.uid());
+
+-- Project members policies
+CREATE POLICY "Project members are viewable by project members"
+ON project_members FOR SELECT
+TO authenticated
+USING (
+  EXISTS (
+    SELECT 1 FROM project_members AS pm
+    WHERE pm.project_id = project_id
+    AND pm.user_id = auth.uid()
+  ) OR
+  EXISTS (
+    SELECT 1 FROM projects
+    WHERE projects.id = project_id
+    AND projects.creator_id = auth.uid()
+  )
+);
+
+CREATE POLICY "Project creators can manage members"
+ON project_members FOR ALL
+TO authenticated
+USING (
+  EXISTS (
+    SELECT 1 FROM projects
+    WHERE projects.id = project_id
+    AND projects.creator_id = auth.uid()
+  )
+);
+
+CREATE POLICY "Users can leave projects"
+ON project_members FOR DELETE
+TO authenticated
+USING (user_id = auth.uid());
+
+-- Join requests policies
+CREATE POLICY "Users can view their own join requests"
+ON join_requests FOR SELECT
+TO authenticated
+USING (user_id = auth.uid());
+
+CREATE POLICY "Project creators can view join requests for their projects"
+ON join_requests FOR SELECT
+TO authenticated
+USING (
+  EXISTS (
+    SELECT 1 FROM projects
+    WHERE projects.id = project_id
+    AND projects.creator_id = auth.uid()
+  )
+);
+
+CREATE POLICY "Users can create join requests"
+ON join_requests FOR INSERT
+TO authenticated
+WITH CHECK (user_id = auth.uid());
+
+CREATE POLICY "Project creators can update join requests"
+ON join_requests FOR UPDATE
+TO authenticated
+USING (
+  EXISTS (
+    SELECT 1 FROM projects
+    WHERE projects.id = project_id
+    AND projects.creator_id = auth.uid()
+  )
+);
+
+-- Commits policies
+CREATE POLICY "Project members can view commits"
+ON commits FOR SELECT
+TO authenticated
+USING (
+  EXISTS (
+    SELECT 1 FROM project_members
+    WHERE project_members.project_id = project_id
+    AND project_members.user_id = auth.uid()
+  ) OR
+  EXISTS (
+    SELECT 1 FROM projects
+    WHERE projects.id = project_id
+    AND projects.creator_id = auth.uid()
+  )
+);
+
+CREATE POLICY "Project creators can manage commits"
+ON commits FOR ALL
+TO authenticated
+USING (
+  EXISTS (
+    SELECT 1 FROM projects
+    WHERE projects.id = project_id
+    AND projects.creator_id = auth.uid()
+  )
+);
+
+CREATE POLICY "Assigned users can update their commits"
+ON commits FOR UPDATE
+TO authenticated
+USING (assigned_to = auth.uid());

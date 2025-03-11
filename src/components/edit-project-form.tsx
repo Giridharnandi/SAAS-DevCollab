@@ -30,11 +30,13 @@ import {
 interface EditProjectFormProps {
   project: any;
   user: User;
+  subscription?: string;
 }
 
 export default function EditProjectForm({
   project,
   user,
+  subscription,
 }: EditProjectFormProps) {
   const router = useRouter();
   const supabase = createClient();
@@ -65,13 +67,31 @@ export default function EditProjectForm({
     setIsLoading(true);
 
     try {
+      // Validate team size based on subscription
+      const teamSize = parseInt(formData.team_size);
+      let maxTeamSize = 5; // Default for free plan
+
+      if (subscription === "Pro Plan") {
+        maxTeamSize = 25;
+      } else if (
+        subscription === "Professional Plan" ||
+        subscription === "Professional Annual Plan"
+      ) {
+        maxTeamSize = 50;
+      } else if (subscription === "Pro Dev Plan") {
+        maxTeamSize = 5; // Pro Dev focuses on unlimited projects, not team size
+      }
+
+      // Ensure team size doesn't exceed subscription limit
+      const finalTeamSize = Math.min(teamSize, maxTeamSize);
+
       const { error } = await supabase
         .from("projects")
         .update({
           title: formData.title,
           description: formData.description,
           visibility: formData.visibility,
-          team_size: parseInt(formData.team_size),
+          team_size: finalTeamSize,
           repository_link: formData.repository_link,
           updated_at: new Date().toISOString(),
         })
@@ -201,6 +221,29 @@ export default function EditProjectForm({
                   <SelectItem value="3">3 members</SelectItem>
                   <SelectItem value="4">4 members</SelectItem>
                   <SelectItem value="5">5 members</SelectItem>
+                  {(subscription === "Pro Plan" ||
+                    subscription === "Professional Plan" ||
+                    subscription === "Professional Annual Plan") && (
+                    <>
+                      <SelectItem value="10">10 members</SelectItem>
+                      <SelectItem value="15">15 members</SelectItem>
+                      <SelectItem value="20">20 members</SelectItem>
+                    </>
+                  )}
+                  {subscription === "Pro Plan" && (
+                    <>
+                      <SelectItem value="25">25 members</SelectItem>
+                    </>
+                  )}
+                  {(subscription === "Professional Plan" ||
+                    subscription === "Professional Annual Plan") && (
+                    <>
+                      <SelectItem value="25">25 members</SelectItem>
+                      <SelectItem value="30">30 members</SelectItem>
+                      <SelectItem value="40">40 members</SelectItem>
+                      <SelectItem value="50">50 members</SelectItem>
+                    </>
+                  )}
                 </SelectContent>
               </Select>
             </div>
@@ -238,10 +281,17 @@ export default function EditProjectForm({
             </div>
           </div>
 
-          <Alert variant="warning">
+          <Alert variant={subscription ? "success" : "warning"}>
             <AlertCircle className="h-4 w-4" />
             <AlertDescription>
-              Teams larger than 5 members require a Pro subscription plan.
+              {subscription === "Pro Plan"
+                ? "Your Pro Plan allows up to 25 team members per project."
+                : subscription === "Professional Plan" ||
+                    subscription === "Professional Annual Plan"
+                  ? "Your Professional Plan allows up to 50 team members per project."
+                  : subscription === "Pro Dev Plan"
+                    ? "Your Pro Dev Plan allows unlimited public projects with up to 5 team members each."
+                    : "Teams larger than 5 members require a subscription plan."}
             </AlertDescription>
           </Alert>
         </div>

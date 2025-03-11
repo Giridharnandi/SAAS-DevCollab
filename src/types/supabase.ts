@@ -283,6 +283,9 @@ export type Database = {
           name: string | null
           profile_picture: string | null
           subscription: string | null
+          subscription_id: string | null
+          subscription_period_end: string | null
+          subscription_status: string | null
           theme: string | null
           token_identifier: string
           updated_at: string | null
@@ -304,6 +307,9 @@ export type Database = {
           name?: string | null
           profile_picture?: string | null
           subscription?: string | null
+          subscription_id?: string | null
+          subscription_period_end?: string | null
+          subscription_status?: string | null
           theme?: string | null
           token_identifier: string
           updated_at?: string | null
@@ -325,6 +331,9 @@ export type Database = {
           name?: string | null
           profile_picture?: string | null
           subscription?: string | null
+          subscription_id?: string | null
+          subscription_period_end?: string | null
+          subscription_status?: string | null
           theme?: string | null
           token_identifier?: string
           updated_at?: string | null

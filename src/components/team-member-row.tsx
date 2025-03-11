@@ -74,7 +74,7 @@ export default function TeamMemberRow({
 
   // Filter commits that are assigned to this member
   const assignedCommits = commits.filter(
-    (commit) => commit.assigned_to === member.users.id,
+    (commit) => commit.assigned_to === member.users?.id,
   );
   const completedCommits = assignedCommits.filter(
     (commit) => commit.status === "completed",
@@ -93,7 +93,7 @@ export default function TeamMemberRow({
     try {
       const { error } = await supabase
         .from("commits")
-        .update({ assigned_to: member.users.id })
+        .update({ assigned_to: member.users?.id })
         .eq("id", selectedCommit);
 
       if (error) throw error;
@@ -116,7 +116,7 @@ export default function TeamMemberRow({
       const { error: commitError } = await supabase
         .from("commits")
         .update({ assigned_to: null })
-        .eq("assigned_to", member.users.id);
+        .eq("assigned_to", member.users?.id);
 
       if (commitError) throw commitError;
 
@@ -141,22 +141,25 @@ export default function TeamMemberRow({
       <TableCell>
         <div className="flex items-center">
           <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center overflow-hidden mr-2">
-            {member.users.profile_picture ? (
+            {member.users?.profile_picture ? (
               <img
                 src={member.users.profile_picture}
-                alt={member.users.name}
+                alt={member.users.name || "User"}
                 className="w-full h-full object-cover"
               />
             ) : (
               <span className="text-xs font-medium">
-                {member.users.name?.substring(0, 2).toUpperCase()}
+                {member.users?.name?.substring(0, 2).toUpperCase() ||
+                  member.user_id.substring(0, 2).toUpperCase()}
               </span>
             )}
           </div>
           <div>
-            <p className="font-medium">{member.users.name}</p>
+            <p className="font-medium">
+              {member.users?.name || "Unknown User"}
+            </p>
             <p className="text-xs text-muted-foreground">
-              {member.users.email}
+              {member.users?.email || member.user_id}
             </p>
           </div>
         </div>
@@ -164,9 +167,9 @@ export default function TeamMemberRow({
 
       <TableCell>
         <Badge variant="outline">
-          {member.users.id === projectId
+          {member.users?.id === projectId
             ? "Admin"
-            : member.users.user_role === "project_creator"
+            : member.users?.user_role === "project_creator"
               ? "Creator"
               : "Member"}
         </Badge>
@@ -185,7 +188,7 @@ export default function TeamMemberRow({
               <DialogHeader>
                 <DialogTitle>Assign Commit</DialogTitle>
                 <DialogDescription>
-                  Assign a commit to {member.users.name}
+                  Assign a commit to {member.users?.name || "this user"}
                 </DialogDescription>
               </DialogHeader>
 
@@ -256,7 +259,9 @@ export default function TeamMemberRow({
           </DialogTrigger>
           <DialogContent className="max-w-md">
             <DialogHeader>
-              <DialogTitle>Commit Status for {member.users.name}</DialogTitle>
+              <DialogTitle>
+                Commit Status for {member.users?.name || "User"}
+              </DialogTitle>
               <DialogDescription>
                 {assignedCommits.length} commits assigned,{" "}
                 {completedCommits.length} completed
@@ -310,7 +315,7 @@ export default function TeamMemberRow({
           size="sm"
           className="text-destructive hover:text-destructive hover:bg-destructive/10"
           onClick={handleRemoveMember}
-          disabled={member.users.user_role === "project_creator" || isLoading}
+          disabled={member.users?.user_role === "project_creator" || isLoading}
         >
           <UserX className="h-4 w-4 mr-2" />
           Remove

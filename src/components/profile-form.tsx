@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -28,6 +28,20 @@ export default function ProfileForm({ user, profile }: ProfileFormProps) {
     theme: profile?.theme || "light",
   });
 
+  // Update form data when profile changes
+  useEffect(() => {
+    if (profile) {
+      setFormData({
+        name: profile.name || user.user_metadata?.full_name || "",
+        username: profile.username || "",
+        location: profile.location || "",
+        description: profile.description || "",
+        mobile: profile.mobile || "",
+        theme: profile.theme || "light",
+      });
+    }
+  }, [profile, user]);
+
   const handleChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>,
   ) => {
@@ -44,24 +58,18 @@ export default function ProfileForm({ user, profile }: ProfileFormProps) {
     setIsLoading(true);
 
     try {
-      // First try to update by id
-      let { error } = await supabase
+      // First check if the profile exists
+      const { data: existingProfile } = await supabase
         .from("users")
-        .update({
-          name: formData.name,
-          username: formData.username,
-          location: formData.location,
-          description: formData.description,
-          mobile: formData.mobile,
-          theme: formData.theme,
-          updated_at: new Date().toISOString(),
-        })
-        .eq("id", user.id);
+        .select("*")
+        .eq("id", user.id)
+        .maybeSingle();
 
-      // If there's an error, try updating by user_id
-      if (error) {
-        console.log("Trying to update by user_id instead");
-        const { error: userIdError } = await supabase
+      let updateError = null;
+
+      if (existingProfile) {
+        // Update by id if profile exists
+        const { error } = await supabase
           .from("users")
           .update({
             name: formData.name,
@@ -72,13 +80,56 @@ export default function ProfileForm({ user, profile }: ProfileFormProps) {
             theme: formData.theme,
             updated_at: new Date().toISOString(),
           })
-          .eq("user_id", user.id);
+          .eq("id", user.id);
 
-        error = userIdError;
+        updateError = error;
+      } else {
+        // Check if profile exists by user_id
+        const { data: existingUserIdProfile } = await supabase
+          .from("users")
+          .select("*")
+          .eq("user_id", user.id)
+          .maybeSingle();
+
+        if (existingUserIdProfile) {
+          // Update by user_id if profile exists
+          const { error } = await supabase
+            .from("users")
+            .update({
+              name: formData.name,
+              username: formData.username,
+              location: formData.location,
+              description: formData.description,
+              mobile: formData.mobile,
+              theme: formData.theme,
+              updated_at: new Date().toISOString(),
+            })
+            .eq("user_id", user.id);
+
+          updateError = error;
+        } else {
+          // Insert new profile if it doesn't exist
+          const { error } = await supabase.from("users").insert({
+            id: user.id,
+            user_id: user.id,
+            name: formData.name,
+            username: formData.username,
+            location: formData.location,
+            description: formData.description,
+            mobile: formData.mobile,
+            theme: formData.theme,
+            email: user.email,
+            user_role: user.user_metadata?.user_role || "project_member",
+            token_identifier: user.id,
+            created_at: new Date().toISOString(),
+          });
+
+          updateError = error;
+        }
       }
 
-      if (error) {
-        console.error("Error updating profile:", error);
+      if (updateError) {
+        console.error("Error updating profile:", updateError);
         alert("Failed to save profile. Please try again.");
         return;
       }
@@ -87,9 +138,17 @@ export default function ProfileForm({ user, profile }: ProfileFormProps) {
       document.documentElement.classList.remove("light", "dark");
       document.documentElement.classList.add(formData.theme);
 
-      router.refresh();
+      // Show success message
+      alert("Profile updated successfully!");
+
+      // Force a refresh to show updated data
+      setTimeout(() => {
+        window.location.href = window.location.pathname;
+      }, 500);
     } catch (error) {
       // Handle error
+      console.error("Error in profile update:", error);
+      alert("An unexpected error occurred. Please try again.");
     } finally {
       setIsLoading(false);
     }

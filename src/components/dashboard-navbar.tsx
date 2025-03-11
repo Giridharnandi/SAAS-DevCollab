@@ -47,7 +47,7 @@ export default function DashboardNavbar() {
           <div className="hidden md:flex items-center space-x-1 ml-6">
             <Link
               href="/dashboard"
-              className={`px-3 py-2 rounded-md text-sm font-medium ${isActive("/dashboard") && !isActive("/dashboard/projects") && !isActive("/dashboard/explore") && !isActive("/dashboard/messages") ? "bg-gray-100 text-gray-900" : "text-gray-700 hover:bg-gray-50"}`}
+              className={`px-3 py-2 rounded-md text-sm font-medium ${isActive("/dashboard") && !isActive("/dashboard/projects") && !isActive("/dashboard/explore") && !isActive("/dashboard/messages") && !isActive("/dashboard/extensions") ? "bg-gray-100 text-gray-900" : "text-gray-700 hover:bg-gray-50"}`}
             >
               Dashboard
             </Link>
@@ -68,6 +68,12 @@ export default function DashboardNavbar() {
               className={`px-3 py-2 rounded-md text-sm font-medium ${isActive("/dashboard/messages") ? "bg-gray-100 text-gray-900" : "text-gray-700 hover:bg-gray-50"}`}
             >
               Messages
+            </Link>
+            <Link
+              href="/dashboard/extensions"
+              className={`px-3 py-2 rounded-md text-sm font-medium ${isActive("/dashboard/extensions") ? "bg-gray-100 text-gray-900" : "text-gray-700 hover:bg-gray-50"}`}
+            >
+              Extensions
             </Link>
           </div>
         </div>
@@ -102,6 +108,12 @@ export default function DashboardNavbar() {
                 <DropdownMenuItem>
                   <MessageSquare className="h-4 w-4 mr-2" />
                   Messages
+                </DropdownMenuItem>
+              </Link>
+              <Link href="/dashboard/extensions">
+                <DropdownMenuItem>
+                  <Code className="h-4 w-4 mr-2" />
+                  Extensions
                 </DropdownMenuItem>
               </Link>
               <Link href="/dashboard/settings">

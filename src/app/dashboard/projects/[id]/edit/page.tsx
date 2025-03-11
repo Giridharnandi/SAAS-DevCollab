@@ -46,6 +46,13 @@ export default async function EditProjectPage({
     );
   }
 
+  // Get user's subscription to determine team size limit
+  const { data: userProfile } = await supabase
+    .from("users")
+    .select("subscription")
+    .eq("id", user.id)
+    .single();
+
   return (
     <>
       <DashboardNavbar />
@@ -71,7 +78,11 @@ export default async function EditProjectPage({
               <CardDescription>Update your project information</CardDescription>
             </CardHeader>
             <CardContent>
-              <EditProjectForm project={project} user={user} />
+              <EditProjectForm
+                project={project}
+                user={user}
+                subscription={userProfile?.subscription}
+              />
             </CardContent>
           </Card>
         </div>

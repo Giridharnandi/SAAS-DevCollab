@@ -89,16 +89,23 @@ export default async function ProjectMembersPage({
       <DashboardNavbar />
       <main className="container mx-auto px-4 py-8">
         <div className="max-w-6xl mx-auto">
-          <div className="flex items-center mb-6">
-            <Link href={`/dashboard/projects/${params.id}`} className="mr-4">
-              <Button variant="outline" size="icon">
-                <ArrowLeft className="h-4 w-4" />
-              </Button>
-            </Link>
-            <div>
-              <h1 className="text-3xl font-bold">Team Management</h1>
-              <p className="text-muted-foreground">Project: {project.title}</p>
+          <div className="flex items-center justify-between mb-6">
+            <div className="flex items-center">
+              <Link href={`/dashboard/projects/${params.id}`} className="mr-4">
+                <Button variant="outline" size="icon">
+                  <ArrowLeft className="h-4 w-4" />
+                </Button>
+              </Link>
+              <div>
+                <h1 className="text-3xl font-bold">Team Management</h1>
+                <p className="text-muted-foreground">
+                  Project: {project.title}
+                </p>
+              </div>
             </div>
+            <Link href={`/dashboard/projects/${params.id}/workflow`}>
+              <Button variant="outline">View Workflow</Button>
+            </Link>
           </div>
 
           <Tabs defaultValue="members">
