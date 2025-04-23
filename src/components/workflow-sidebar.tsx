@@ -127,21 +127,21 @@ export default function WorkflowSidebar({
 
       <div className="flex border-b">
         <Button
-          variant={activeTab === "elements" ? "subtle" : "ghost"}
+          variant={activeTab === "elements" ? "secondary" : "ghost"}
           className="flex-1 rounded-none"
           onClick={() => setActiveTab("elements")}
         >
           Elements
         </Button>
         <Button
-          variant={activeTab === "data" ? "subtle" : "ghost"}
+          variant={activeTab === "data" ? "secondary" : "ghost"}
           className="flex-1 rounded-none"
           onClick={() => setActiveTab("data")}
         >
           Data
         </Button>
         <Button
-          variant={activeTab === "team" ? "subtle" : "ghost"}
+          variant={activeTab === "team" ? "secondary" : "ghost"}
           className="flex-1 rounded-none"
           onClick={() => setActiveTab("team")}
         >

@@ -95,13 +95,33 @@ export default async function WorkflowPage({
                 commits={commits || []}
               />
               <div className="flex-1 overflow-hidden">
-                <WorkflowBoard
-                  projectId={project.id}
-                  isAdmin={isProjectCreator}
-                  members={members || []}
-                  commits={commits || []}
-                  initialWorkflow={project.workflow_data}
-                />
+                {hasWorkflowAccess ? (
+                  <WorkflowBoard
+                    projectId={project.id}
+                    isAdmin={isProjectCreator}
+                    members={members || []}
+                    commits={commits || []}
+                    initialWorkflow={project.workflow_data}
+                  />
+                ) : (
+                  <div className="flex items-center justify-center h-full">
+                    <div className="text-center max-w-md p-6 bg-muted/30 rounded-lg">
+                      <h3 className="text-lg font-medium mb-2">
+                        Subscription Required
+                      </h3>
+                      <p className="mb-4 text-muted-foreground">
+                        The workflow management feature requires a Pro or
+                        Professional subscription. Please upgrade your
+                        subscription to access this feature.
+                      </p>
+                      <Button asChild>
+                        <Link href="/dashboard/profile">
+                          Upgrade Subscription
+                        </Link>
+                      </Button>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           </Card>
