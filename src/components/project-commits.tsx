@@ -62,7 +62,7 @@ export default function ProjectCommits({
       setLocalCommits([newCommit, ...localCommits]);
       setNewCommitMessage("");
     } catch (error) {
-      // Handle error
+      console.error("Error adding commit:", error);
     } finally {
       setIsLoading(false);
     }
@@ -92,7 +92,7 @@ export default function ProjectCommits({
         ),
       );
     } catch (error) {
-      // Handle error
+      console.error("Error updating commit status:", error);
     }
   };
 

@@ -7,6 +7,7 @@ import { ArrowLeft } from "lucide-react";
 import Link from "next/link";
 import WorkflowBoard from "@/components/workflow-board";
 import { WorkflowSidebarWrapper } from "./client-components";
+import { isSubscriptionActive } from "@/utils/subscription";
 
 export default async function WorkflowPage({
   params,
@@ -52,6 +53,25 @@ export default async function WorkflowPage({
       `/dashboard/projects/${params.id}?error=You do not have access to this project's workflow`,
     );
   }
+
+  // Check if user has the required subscription for workflow features
+  const { data: userData } = await supabase
+    .from("users")
+    .select("subscription, subscription_status, subscription_period_end")
+    .eq("id", user.id)
+    .single();
+
+  const hasActiveSubscription = isSubscriptionActive(
+    userData?.subscription_status,
+    userData?.subscription_period_end,
+  );
+
+  const hasWorkflowAccess =
+    isProjectCreator ||
+    (hasActiveSubscription &&
+      (userData?.subscription === "Pro Plan" ||
+        userData?.subscription === "Professional Plan" ||
+        userData?.subscription === "Professional Annual Plan"));
 
   // Fetch project members
   const { data: members } = await supabase
